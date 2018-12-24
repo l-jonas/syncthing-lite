@@ -12,6 +12,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import net.syncthing.java.bep.index.browser.DirectoryContentListing
 import net.syncthing.java.bep.index.browser.DirectoryNotFoundListing
+import net.syncthing.java.core.beans.DirectoryFileInfo
+import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.beans.FolderInfo
 import net.syncthing.lite.R
@@ -133,6 +135,10 @@ class SyncthingProvider : DocumentsProvider() {
                         path = getPathForDocId(documentId)
                 ) ?: throw FileNotFoundException()
 
+                if (!(fileInfo is FileFileInfo)) {
+                    throw IllegalArgumentException("provided path is not a file")
+                }
+
                 signal?.setOnCancelListener {
                     this.coroutineContext.cancel()
                 }
@@ -153,13 +159,19 @@ class SyncthingProvider : DocumentsProvider() {
         result.newRow().apply {
             add(Document.COLUMN_DOCUMENT_ID, getDocIdForFile(fileInfo))
             add(Document.COLUMN_DISPLAY_NAME, fileInfo.fileName)
-            add(Document.COLUMN_SIZE, fileInfo.size)
+            add(
+                    Document.COLUMN_SIZE,
+                    when (fileInfo) {
+                        is DirectoryFileInfo -> 0
+                        is FileFileInfo -> fileInfo.size
+                    }
+            )
             add(
                     Document.COLUMN_MIME_TYPE,
-                    if (fileInfo.isDirectory())
-                        Document.MIME_TYPE_DIR
-                    else
-                        MimeType.getFromFilename(fileInfo.fileName)
+                    when (fileInfo) {
+                        is DirectoryFileInfo -> Document.MIME_TYPE_DIR
+                        is FileFileInfo -> MimeType.getFromFilename(fileInfo.fileName)
+                    }
             )
             add(Document.COLUMN_LAST_MODIFIED, fileInfo.lastModified)
             add(Document.COLUMN_FLAGS, 0)

@@ -1,7 +1,7 @@
 package net.syncthing.repository.android.database.converters
 
 import android.arch.persistence.room.TypeConverter
-import net.syncthing.java.core.beans.FileInfo
+import net.syncthing.repository.android.database.item.FileInfoItemType
 
 class FileTypeConverter {
     companion object {
@@ -10,15 +10,15 @@ class FileTypeConverter {
     }
 
     @TypeConverter
-    fun toString(type: FileInfo.FileType) = when (type) {
-        FileInfo.FileType.DIRECTORY -> DIRECTORY
-        FileInfo.FileType.FILE -> FILE
+    fun toString(type: FileInfoItemType) = when (type) {
+        FileInfoItemType.Directory -> DIRECTORY
+        FileInfoItemType.File -> FILE
     }
 
     @TypeConverter
     fun fromString(value: String)  = when (value) {
-        FILE -> FileInfo.FileType.FILE
-        DIRECTORY -> FileInfo.FileType.DIRECTORY
+        FILE -> FileInfoItemType.File
+        DIRECTORY -> FileInfoItemType.Directory
         else -> throw IllegalArgumentException()
     }
 }

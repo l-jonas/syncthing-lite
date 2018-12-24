@@ -9,7 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import net.syncthing.java.bep.BlockPullerStatus
 import net.syncthing.java.client.SyncthingClient
-import net.syncthing.java.core.beans.FileInfo
+import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.lite.BuildConfig
 import org.apache.commons.io.FileUtils
 import java.io.File
@@ -19,7 +19,7 @@ import kotlin.coroutines.resumeWithException
 
 class DownloadFileTask(private val fileStorageDirectory: File,
                        syncthingClient: SyncthingClient,
-                       private val fileInfo: FileInfo,
+                       private val fileInfo: FileFileInfo,
                        private val onProgress: (status: BlockPullerStatus) -> Unit,
                        private val onComplete: (File) -> Unit,
                        private val onError: (Exception) -> Unit) {
@@ -31,7 +31,7 @@ class DownloadFileTask(private val fileStorageDirectory: File,
         suspend fun downloadFileCoroutine(
                 externalCacheDir: File,
                 syncthingClient: SyncthingClient,
-                fileInfo: FileInfo,
+                fileInfo: FileFileInfo,
                 onProgress: (status: BlockPullerStatus) -> Unit
         ) = suspendCancellableCoroutine<File> {
             continuation ->
@@ -59,7 +59,7 @@ class DownloadFileTask(private val fileStorageDirectory: File,
     private var doneListenerCalled = false
 
     init {
-        val file = DownloadFilePath(fileStorageDirectory, fileInfo.hash!!)
+        val file = DownloadFilePath(fileStorageDirectory, fileInfo.hash)
 
         GlobalScope.launch {
             if (file.targetFile.exists()) {

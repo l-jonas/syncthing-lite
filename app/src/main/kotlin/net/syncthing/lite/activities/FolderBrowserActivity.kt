@@ -11,6 +11,8 @@ import net.syncthing.java.bep.index.browser.DirectoryContentListing
 import net.syncthing.java.bep.index.browser.DirectoryListing
 import net.syncthing.java.bep.index.browser.DirectoryNotFoundListing
 import net.syncthing.java.bep.index.browser.IndexBrowser
+import net.syncthing.java.core.beans.DirectoryFileInfo
+import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.utils.PathUtils
 import net.syncthing.lite.R
@@ -54,15 +56,14 @@ class FolderBrowserActivity : SyncthingActivity() {
         }
         adapter.listener = object: FolderContentsListener {
             override fun onItemClicked(fileInfo: FileInfo) {
-                if (fileInfo.isDirectory()) {
-                    path.offer(fileInfo.path)
-                } else {
-                    DownloadFileDialogFragment.newInstance(fileInfo).show(supportFragmentManager)
+                when (fileInfo) {
+                    is DirectoryFileInfo -> path.offer(fileInfo.path)
+                    is FileFileInfo -> DownloadFileDialogFragment.newInstance(fileInfo).show(supportFragmentManager)
                 }
             }
 
             override fun onItemLongClicked(fileInfo: FileInfo): Boolean {
-                return if (fileInfo.type == FileInfo.FileType.FILE) {
+                return if (fileInfo is FileFileInfo) {
                     FileMenuDialogFragment.newInstance(fileInfo).show(supportFragmentManager)
 
                     true

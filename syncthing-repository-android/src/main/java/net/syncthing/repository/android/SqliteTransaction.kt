@@ -67,7 +67,11 @@ class SqliteTransaction(
 
     override fun updateFileInfo(fileInfo: FileInfo, fileBlocks: FileBlocks?) = runIfAllowed {
         if (fileBlocks != null) {
-            FileInfo.checkBlocks(fileInfo, fileBlocks)
+            if (!(fileInfo is FileFileInfo)) {
+                throw IllegalArgumentException("provided fileBlocks but not fileInfo which is a FileFileInfo")
+            }
+
+            FileFileInfo.checkBlocks(fileInfo, fileBlocks)
 
             database.fileBlocks().mergeBlock(FileBlocksItem.fromNative(fileBlocks))
         }

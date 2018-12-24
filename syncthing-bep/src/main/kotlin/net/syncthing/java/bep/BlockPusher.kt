@@ -23,10 +23,7 @@ import kotlinx.coroutines.runBlocking
 import net.syncthing.java.bep.BlockExchangeProtos.Vector
 import net.syncthing.java.bep.connectionactor.ConnectionActorWrapper
 import net.syncthing.java.bep.index.*
-import net.syncthing.java.core.beans.BlockInfo
-import net.syncthing.java.core.beans.DeviceId
-import net.syncthing.java.core.beans.FileInfo.Version
-import net.syncthing.java.core.beans.FolderStats
+import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.utils.BlockUtils
 import net.syncthing.java.core.utils.NetworkUtils
 import org.apache.commons.io.IOUtils
@@ -56,7 +53,12 @@ class BlockPusher(private val localDeviceId: DeviceId,
         NetworkUtils.assertProtocol(connectionHandler.hasFolder(fileInfo.folder), {"supplied connection handler $connectionHandler will not share folder ${fileInfo.folder}"})
         return sendIndexUpdate(folderId, BlockExchangeProtos.FileInfo.newBuilder()
                 .setName(targetPath)
-                .setType(BlockExchangeProtos.FileInfoType.valueOf(fileInfo.type.name))
+                .setType(
+                        when (fileInfo) {
+                            is FileFileInfo -> BlockExchangeProtos.FileInfoType.FILE
+                            is DirectoryFileInfo -> BlockExchangeProtos.FileInfoType.DIRECTORY
+                        }
+                )
                 .setDeleted(true), fileInfo.versionList)
     }
 
@@ -113,7 +115,7 @@ class BlockPusher(private val localDeviceId: DeviceId,
 
                     if (indexFolderId == folderId) {
                         for (fileInfo2 in newRecords) {
-                            if (fileInfo2.path == targetPath && fileInfo2.hash == dataSource.getHash()) { //TODO check not invalid
+                            if (fileInfo2.path == targetPath && fileInfo2 is FileFileInfo && fileInfo2.hash == dataSource.getHash()) { //TODO check not invalid
                                 //                                sentBlocks.addAll(dataSource.getHashes());
                                 isCompleted.set(true)
                                 synchronized(updateLock) {
@@ -179,7 +181,7 @@ class BlockPusher(private val localDeviceId: DeviceId,
     }
 
     private suspend fun sendIndexUpdate(folderId: String, fileInfoBuilder: BlockExchangeProtos.FileInfo.Builder,
-                                        oldVersions: Iterable<Version>?): BlockExchangeProtos.IndexUpdate {
+                                        oldVersions: Iterable<FileVersion>?): BlockExchangeProtos.IndexUpdate {
         run {
             val nextSequence = indexHandler.getNextSequenceNumber()
             val list = oldVersions ?: emptyList()

@@ -9,6 +9,7 @@ import android.support.v4.os.CancellationSignal
 import android.util.Log
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.lite.BuildConfig
 import net.syncthing.lite.library.DownloadFileTask
 import net.syncthing.lite.library.LibraryHandler
@@ -51,6 +52,10 @@ class DownloadFileDialogViewModel : ViewModel() {
                         folder = fileSpec.folder,
                         path = fileSpec.path
                 )!!
+
+                if (!(fileInfo is FileFileInfo)) {
+                    throw IllegalArgumentException("provided path does not result in a file")
+                }
 
                 val task = DownloadFileTask(
                         fileStorageDirectory = externalCacheDir,

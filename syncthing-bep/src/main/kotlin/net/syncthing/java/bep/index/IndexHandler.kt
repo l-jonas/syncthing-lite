@@ -167,10 +167,10 @@ class IndexHandler(
             } else {
                 val fileBlocks = transaction.findFileBlocks(folder, path)
 
-                assert(fileInfo.isFile())
+                assert(fileInfo is FileFileInfo); fileInfo as FileFileInfo
                 checkNotNull(fileBlocks) {"file blocks not found for file info = $fileInfo"}
 
-                FileInfo.checkBlocks(fileInfo, fileBlocks)
+                FileFileInfo.checkBlocks(fileInfo, fileBlocks)
 
                 Pair.of(fileInfo, fileBlocks)
             }

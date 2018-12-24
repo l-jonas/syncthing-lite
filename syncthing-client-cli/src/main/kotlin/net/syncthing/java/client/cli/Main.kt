@@ -20,7 +20,8 @@ import net.syncthing.java.bep.index.browser.IndexBrowser
 import net.syncthing.java.client.SyncthingClient
 import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
-import net.syncthing.java.core.beans.FileInfo
+import net.syncthing.java.core.beans.DirectoryFileInfo
+import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.repository.repo.SqlRepository
 import org.apache.commons.cli.*
@@ -108,7 +109,7 @@ class Main(private val commandLine: CommandLine) {
                 System.out.println("file path = $folderAndPath")
                 val folder = folderAndPath.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[0]
                 val path = folderAndPath.split(":".toRegex()).dropLastWhile({ it.isEmpty() }).toTypedArray()[1]
-                val fileInfo = FileInfo(folder = folder, path = path, type = FileInfo.FileType.FILE)
+                val fileInfo = syncthingClient.indexHandler.getFileInfoByPath(folder, path)!!
                 try {
                     val inputStream = syncthingClient.pullFileSync(fileInfo)
                     val fileName = syncthingClient.indexHandler.getFileInfoByPath(folder, path)!!.fileName
@@ -191,7 +192,14 @@ class Main(private val commandLine: CommandLine) {
 
                     if (listing is DirectoryContentListing) {
                         for (fileInfo in listing.entries) {
-                            System.out.println("${fileInfo.type.name.substring(0, 1)}\t${fileInfo.describeSize()}\t${fileInfo.path}")
+                            when (fileInfo) {
+                                is FileFileInfo -> {
+                                    System.out.println("f\t${FileUtils.byteCountToDisplaySize(fileInfo.size)}\t${fileInfo.path}")
+                                }
+                                is DirectoryFileInfo -> {
+                                    System.out.println("d\t${fileInfo.path}")
+                                }
+                            }.let { /* require handling all paths */ }
                         }
                     }
                 }

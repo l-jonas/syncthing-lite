@@ -19,10 +19,10 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.consume
 import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.withContext
-import net.syncthing.java.bep.index.FolderStatsUpdatedEvent
 import net.syncthing.java.bep.index.IndexHandler
-import net.syncthing.java.bep.index.IndexInfoUpdateEvent
 import net.syncthing.java.bep.index.IndexRecordAcquiredEvent
+import net.syncthing.java.core.beans.DirectoryFileInfo
+import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.interfaces.IndexRepository
 import net.syncthing.java.core.interfaces.IndexTransaction
@@ -35,14 +35,12 @@ class IndexBrowser internal constructor(
 ) {
     companion object {
         val sortAlphabeticallyDirectoriesFirst: Comparator<FileInfo> =
-                compareBy<FileInfo>({!isParent(it) }, {!it.isDirectory()})
+                compareBy<FileInfo> {it is FileFileInfo}
                         .thenBy { it.fileName.toLowerCase() }
 
         val sortByLastModification: Comparator<FileInfo> =
-                compareBy<FileInfo>({!isParent(it) }, {it.lastModified})
+                compareBy<FileInfo> {it.lastModified}
                         .thenBy { it.fileName.toLowerCase() }
-
-        private fun isParent(fileInfo: FileInfo) = PathUtils.isParent(fileInfo.path)
 
         fun getPathFileName(path: String) = PathUtils.getFileName(path)
 
@@ -55,7 +53,7 @@ class IndexBrowser internal constructor(
         val parentEntry = if (PathUtils.isRoot(path)) null else getFileInfoByPathAllowNull(folder, PathUtils.getParentPath(path), indexTransaction)
         val directoryInfo = getFileInfoByPathAllowNull(folder, path, indexTransaction)
 
-        if ((parentPath != null && parentEntry == null) || directoryInfo == null || directoryInfo.type != FileInfo.FileType.DIRECTORY) {
+        if ((parentPath != null && parentEntry == null) || directoryInfo == null || !(directoryInfo is DirectoryFileInfo)) {
             DirectoryNotFoundListing(folder, path)
         } else {
             DirectoryContentListing(
@@ -90,7 +88,7 @@ class IndexBrowser internal constructor(
                 // let Kotlin understand that the value does not change during running this
                 val directoryInfo = directoryInfo
 
-                val newStatus = if ((parentPath != null && parentEntry == null) || directoryInfo == null || directoryInfo.type != FileInfo.FileType.DIRECTORY) {
+                val newStatus = if ((parentPath != null && parentEntry == null) || directoryInfo == null || !(directoryInfo is DirectoryFileInfo)) {
                     DirectoryNotFoundListing(folder, path)
                 } else {
                     DirectoryContentListing(
@@ -153,7 +151,14 @@ class IndexBrowser internal constructor(
 
     fun getFileInfoByAbsolutePathAllowNull(folder: String, path: String): FileInfo? {
         return if (PathUtils.isRoot(path)) {
-            FileInfo(folder = folder, type = FileInfo.FileType.DIRECTORY, path = PathUtils.ROOT_PATH)
+            DirectoryFileInfo(
+                    folder = folder,
+                    path = PathUtils.ROOT_PATH,
+                    isDeleted = false,
+                    versionList = emptyList(),
+                    // TODO: is there a last modified somewhere?
+                    lastModified = Date(0)
+            )
         } else {
             indexRepository.runInTransaction { it.findNotDeletedFileInfo(folder, path) }
         }
@@ -164,7 +169,14 @@ class IndexBrowser internal constructor(
 
     fun getFileInfoByPathAllowNull(folder: String, path: String, transaction: IndexTransaction): FileInfo? {
         return if (PathUtils.isRoot(path)) {
-            FileInfo(folder = folder, type = FileInfo.FileType.DIRECTORY, path = PathUtils.ROOT_PATH)
+            DirectoryFileInfo(
+                    folder = folder,
+                    path = PathUtils.ROOT_PATH,
+                    isDeleted = false,
+                    versionList = emptyList(),
+                    // TODO: is there a last modified somewhere?
+                    lastModified = Date(0)
+            )
         } else {
             transaction.findNotDeletedFileInfo(folder, path)
         }

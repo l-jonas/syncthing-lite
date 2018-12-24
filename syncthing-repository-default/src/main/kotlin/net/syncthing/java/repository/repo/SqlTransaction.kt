@@ -184,20 +184,29 @@ class SqlTransaction(
     private fun readFileInfo(resultSet: ResultSet): FileInfo {
         val folder = resultSet.getString("folder")
         val path = resultSet.getString("path")
-        val fileType = FileInfo.FileType.valueOf(resultSet.getString("file_type"))
+        val fileType = resultSet.getString("file_type")
         val lastModified = Date(resultSet.getLong("last_modified"))
-        val versionList = listOf(FileInfo.Version(resultSet.getLong("version_id"), resultSet.getLong("version_value")))
+        val versionList = listOf(FileVersion(resultSet.getLong("version_id"), resultSet.getLong("version_value")))
         val isDeleted = resultSet.getBoolean("is_deleted")
-        val builder = FileInfo.Builder()
-                .setFolder(folder)
-                .setPath(path)
-                .setLastModified(lastModified)
-                .setVersionList(versionList)
-                .setDeleted(isDeleted)
-        return if (fileType == FileInfo.FileType.DIRECTORY) {
-            builder.setTypeDir().build()
-        } else {
-            builder.setTypeFile().setSize(resultSet.getLong("size")).setHash(resultSet.getString("hash")).build()
+
+        return when (fileType) {
+            SqlConstants.FILE_TYPE_DIRECTORY -> DirectoryFileInfo(
+                    folder = folder,
+                    path = path,
+                    isDeleted = isDeleted,
+                    versionList = versionList,
+                    lastModified = lastModified
+            )
+            SqlConstants.FILE_TYPE_FILE -> FileFileInfo(
+                    folder = folder,
+                    path = path,
+                    isDeleted = isDeleted,
+                    versionList = versionList,
+                    hash = resultSet.getString("hash"),
+                    size = resultSet.getLong("size"),
+                    lastModified = lastModified
+            )
+            else -> throw IllegalStateException("unknown file type: $fileType")
         }
     }
 
@@ -230,7 +239,11 @@ class SqlTransaction(
         val version = fileInfo.versionList.last()
 
         if (fileBlocks != null) {
-            FileInfo.checkBlocks(fileInfo, fileBlocks)
+            if (!(fileInfo is FileFileInfo)) {
+                throw IllegalArgumentException("fileBlocks != null requires fileInfo of type FileFileInfo")
+            }
+
+            FileFileInfo.checkBlocks(fileInfo, fileBlocks)
             connection.prepareStatement("MERGE INTO file_blocks"
                     + " (folder,path,hash,size,blocks)"
                     + " VALUES (?,?,?,?,?)").use { prepareStatement ->
@@ -258,17 +271,24 @@ class SqlTransaction(
             prepareStatement.setString(3, fileInfo.fileName)
             prepareStatement.setString(4, fileInfo.parent)
             prepareStatement.setLong(7, fileInfo.lastModified.time)
-            prepareStatement.setString(8, fileInfo.type.name)
+            prepareStatement.setString(8, when (fileInfo) {
+                is FileFileInfo -> SqlConstants.FILE_TYPE_FILE
+                is DirectoryFileInfo -> SqlConstants.FILE_TYPE_DIRECTORY
+            })
             prepareStatement.setLong(9, version.id)
             prepareStatement.setLong(10, version.value)
             prepareStatement.setBoolean(11, fileInfo.isDeleted)
-            if (fileInfo.isDirectory()) {
-                prepareStatement.setNull(5, Types.BIGINT)
-                prepareStatement.setNull(6, Types.VARCHAR)
-            } else {
-                prepareStatement.setLong(5, fileInfo.size!!)
-                prepareStatement.setString(6, fileInfo.hash)
-            }
+            when (fileInfo) {
+                is FileFileInfo -> {
+                    prepareStatement.setLong(5, fileInfo.size)
+                    prepareStatement.setString(6, fileInfo.hash)
+                }
+                is DirectoryFileInfo -> {
+                    prepareStatement.setNull(5, Types.BIGINT)
+                    prepareStatement.setNull(6, Types.VARCHAR)
+                }
+            }.let { /* require handling all paths */ }
+
             prepareStatement.executeUpdate()
         }
     }
@@ -307,17 +327,24 @@ class SqlTransaction(
                 prepareStatement.setString(3, fileInfo.fileName)
                 prepareStatement.setString(4, fileInfo.parent)
                 prepareStatement.setLong(7, fileInfo.lastModified.time)
-                prepareStatement.setString(8, fileInfo.type.name)
+                prepareStatement.setString(8, when (fileInfo) {
+                    is FileFileInfo -> SqlConstants.FILE_TYPE_FILE
+                    is DirectoryFileInfo -> SqlConstants.FILE_TYPE_DIRECTORY
+                })
                 prepareStatement.setLong(9, version.id)
                 prepareStatement.setLong(10, version.value)
                 prepareStatement.setBoolean(11, fileInfo.isDeleted)
-                if (fileInfo.isDirectory()) {
-                    prepareStatement.setNull(5, Types.BIGINT)
-                    prepareStatement.setNull(6, Types.VARCHAR)
-                } else {
-                    prepareStatement.setLong(5, fileInfo.size!!)
-                    prepareStatement.setString(6, fileInfo.hash)
-                }
+                when (fileInfo) {
+                    is FileFileInfo -> {
+                        prepareStatement.setLong(5, fileInfo.size)
+                        prepareStatement.setString(6, fileInfo.hash)
+                    }
+                    is DirectoryFileInfo -> {
+                        prepareStatement.setNull(5, Types.BIGINT)
+                        prepareStatement.setNull(6, Types.VARCHAR)
+                    }
+                }.let { /* require handling all paths */ }
+
                 prepareStatement.executeUpdate()
             }
         }

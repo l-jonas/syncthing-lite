@@ -4,6 +4,8 @@ import android.support.v7.widget.RecyclerView
 import android.text.format.DateUtils
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import net.syncthing.java.core.beans.DirectoryFileInfo
+import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.lite.R
 import net.syncthing.lite.databinding.ListviewFileBinding
@@ -36,15 +38,18 @@ class FolderContentsAdapter: RecyclerView.Adapter<FolderContentsViewHolder>() {
 
         binding.fileName = fileInfo.fileName
 
-        if (fileInfo.isDirectory()) {
-            binding.fileIcon.setImageResource(R.drawable.ic_folder_black_24dp)
-            binding.fileSize = null
-        } else {
-            binding.fileIcon.setImageResource(R.drawable.ic_image_black_24dp)
-            binding.fileSize = binding.root.context.getString(R.string.file_info,
-                    FileUtils.byteCountToDisplaySize(fileInfo.size!!),
-                    DateUtils.getRelativeDateTimeString(binding.root.context, fileInfo.lastModified.time, DateUtils.MINUTE_IN_MILLIS, DateUtils.WEEK_IN_MILLIS, 0))
-        }
+        when (fileInfo) {
+            is DirectoryFileInfo -> {
+                binding.fileIcon.setImageResource(R.drawable.ic_folder_black_24dp)
+                binding.fileSize = null
+            }
+            is FileFileInfo -> {
+                binding.fileIcon.setImageResource(R.drawable.ic_image_black_24dp)
+                binding.fileSize = binding.root.context.getString(R.string.file_info,
+                        FileUtils.byteCountToDisplaySize(fileInfo.size),
+                        DateUtils.getRelativeDateTimeString(binding.root.context, fileInfo.lastModified.time, DateUtils.MINUTE_IN_MILLIS, DateUtils.WEEK_IN_MILLIS, 0))
+            }
+        }.let { /* require handling all paths */ }
 
         binding.root.setOnClickListener {
             listener?.onItemClicked(fileInfo)

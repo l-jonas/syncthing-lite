@@ -22,6 +22,7 @@ import net.syncthing.java.bep.index.IndexHandler
 import net.syncthing.java.bep.utils.longSumBy
 import net.syncthing.java.core.beans.BlockInfo
 import net.syncthing.java.core.beans.FileBlocks
+import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.java.core.beans.FileInfo
 import net.syncthing.java.core.interfaces.TempRepository
 import org.bouncycastle.util.encoders.Hex
@@ -41,6 +42,10 @@ object BlockPuller {
             indexHandler: IndexHandler,
             tempRepository: TempRepository
     ): InputStream {
+        if (!(fileInfo is FileFileInfo)) {
+            throw IllegalArgumentException("file required for downloading but no one provided")
+        }
+
         val connectionHelper = MultiConnectionHelper(connections) {
             it.hasFolder(fileInfo.folder)
         }

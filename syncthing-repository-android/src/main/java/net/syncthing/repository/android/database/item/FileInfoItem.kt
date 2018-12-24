@@ -4,7 +4,10 @@ import android.arch.persistence.room.ColumnInfo
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.Index
 import android.arch.persistence.room.TypeConverters
+import net.syncthing.java.core.beans.DirectoryFileInfo
+import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.java.core.beans.FileInfo
+import net.syncthing.java.core.beans.FileVersion
 import net.syncthing.repository.android.database.converters.DateConverter
 import net.syncthing.repository.android.database.converters.FileTypeConverter
 import java.util.*
@@ -32,7 +35,7 @@ data class FileInfoItem(
         @ColumnInfo(name = "last_modified")
         val lastModified: Date,
         @ColumnInfo(name = "file_type")
-        val fileType: FileInfo.FileType,
+        val fileType: FileInfoItemType,
         @ColumnInfo(name = "version_id")
         val versionId: Long,
         @ColumnInfo(name = "version_value")
@@ -41,29 +44,44 @@ data class FileInfoItem(
         val isDeleted: Boolean
 ) {
     companion object {
-        fun fromNative(item: FileInfo) = FileInfoItem(
-                folder = item.folder,
-                path = item.path,
-                fileName = item.fileName,
-                parent = item.parent,
-                lastModified = item.lastModified,
-                fileType = item.type,
-                versionId = item.versionList.last().id,
-                versionValue = item.versionList.last().value,
-                isDeleted = item.isDeleted,
-                size = if (item.isDirectory()) null else item.size,
-                hash = if (item.isDirectory()) null else item.hash
-        )
+        fun fromNative(item: FileInfo) = when (item) {
+            is FileFileInfo -> FileInfoItem(
+                    folder = item.folder,
+                    path = item.path,
+                    fileName = item.fileName,
+                    parent = item.parent,
+                    lastModified = item.lastModified,
+                    fileType = FileInfoItemType.File,
+                    versionId = item.versionList.last().id,
+                    versionValue = item.versionList.last().value,
+                    isDeleted = item.isDeleted,
+                    size = item.size,
+                    hash = item.hash
+            )
+            is DirectoryFileInfo -> FileInfoItem(
+                    folder = item.folder,
+                    path = item.path,
+                    fileName = item.fileName,
+                    parent = item.parent,
+                    lastModified = item.lastModified,
+                    fileType = FileInfoItemType.Directory,
+                    versionId = item.versionList.last().id,
+                    versionValue = item.versionList.last().value,
+                    isDeleted = item.isDeleted,
+                    size = null,
+                    hash = null
+            )
+        }
     }
 
     init {
         when (fileType) {
-            FileInfo.FileType.DIRECTORY -> {
+            FileInfoItemType.Directory -> {
                 if (size != null || hash != null) {
                     throw IllegalArgumentException()
                 }
             }
-            FileInfo.FileType.FILE -> {
+            FileInfoItemType.File -> {
                 if (size == null || hash == null) {
                     throw IllegalArgumentException()
                 }
@@ -73,19 +91,30 @@ data class FileInfoItem(
 
     @delegate:Transient
     val native: FileInfo by lazy {
-        FileInfo(
-                folder = folder,
-                type = fileType,
-                path = path,
-                lastModified = lastModified,
-                size = size,
-                hash = hash,
-                versionList = listOf(FileInfo.Version(
-                        id = versionId,
-                        value = versionValue
-                )),
-                isDeleted = isDeleted
-        )
+        when (fileType) {
+            FileInfoItemType.Directory -> DirectoryFileInfo(
+                    folder = folder,
+                    path = path,
+                    lastModified = lastModified,
+                    versionList = listOf(FileVersion(
+                            id = versionId,
+                            value = versionValue
+                    )),
+                    isDeleted = isDeleted
+            )
+            FileInfoItemType.File -> FileFileInfo(
+                    folder = folder,
+                    path = path,
+                    lastModified = lastModified,
+                    size = size!!,
+                    hash = hash!!,
+                    versionList = listOf(FileVersion(
+                            id = versionId,
+                            value = versionValue
+                    )),
+                    isDeleted = isDeleted
+            )
+        }
     }
 }
 
@@ -94,3 +123,7 @@ data class FileInfoLastModified(
         @ColumnInfo(name = "last_modified")
         val lastModified: Date
 )
+
+enum class FileInfoItemType {
+    File, Directory
+}

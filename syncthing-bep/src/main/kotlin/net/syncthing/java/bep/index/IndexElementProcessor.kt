@@ -1,15 +1,10 @@
 package net.syncthing.java.bep.index
 
 import net.syncthing.java.bep.BlockExchangeProtos
-import net.syncthing.java.core.beans.BlockInfo
-import net.syncthing.java.core.beans.FileBlocks
-import net.syncthing.java.core.beans.FileInfo
-import net.syncthing.java.core.exception.ExceptionDetailException
-import net.syncthing.java.core.exception.ExceptionDetails
+import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.interfaces.IndexTransaction
 import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.util.*
 
 object IndexElementProcessor {
@@ -71,33 +66,51 @@ object IndexElementProcessor {
             folder: String,
             bepFileInfo: BlockExchangeProtos.FileInfo
     ): Pair<FileInfo, FileBlocks?>? {
-        val builder = FileInfo.Builder()
-                .setFolder(folder)
-                .setPath(bepFileInfo.name)
-                .setLastModified(Date(bepFileInfo.modifiedS * 1000 + bepFileInfo.modifiedNs / 1000000))
-                .setVersionList((if (bepFileInfo.hasVersion()) bepFileInfo.version.countersList else null ?: emptyList()).map { record -> FileInfo.Version(record.id, record.value) })
-                .setDeleted(bepFileInfo.deleted)
+        val path = bepFileInfo.name
+        val isDeleted = bepFileInfo.deleted
+        val lastModified = Date(bepFileInfo.modifiedS * 1000 + bepFileInfo.modifiedNs / 1000000)
+        val versionList = (bepFileInfo.version?.countersList ?: emptyList())
+                .map { record -> FileVersion(record.id, record.value) }
 
-        var fileBlocks: FileBlocks? = null
-
-        when (bepFileInfo.type) {
+        return when (bepFileInfo.type) {
             BlockExchangeProtos.FileInfoType.FILE -> {
-                fileBlocks = FileBlocks(folder, builder.getPath()!!, ((bepFileInfo.blocksList ?: emptyList())).map { record ->
-                    BlockInfo(record.offset, record.size, Hex.toHexString(record.hash.toByteArray()))
-                })
-                builder
-                        .setTypeFile()
-                        .setHash(fileBlocks.hash)
-                        .setSize(bepFileInfo.size)
+                val fileBlocks = FileBlocks(
+                        folder,
+                        path,
+                        ((bepFileInfo.blocksList ?: emptyList())).map { record ->
+                            BlockInfo(record.offset, record.size, Hex.toHexString(record.hash.toByteArray()))
+                        }
+                )
+
+                val fileInfo = FileFileInfo(
+                        folder = folder,
+                        path = path,
+                        isDeleted = isDeleted,
+                        lastModified = lastModified,
+                        versionList = versionList,
+                        hash = fileBlocks.hash,
+                        size = bepFileInfo.size
+                )
+
+                fileInfo to fileBlocks
             }
-            BlockExchangeProtos.FileInfoType.DIRECTORY -> builder.setTypeDir()
+            BlockExchangeProtos.FileInfoType.DIRECTORY -> {
+                val fileInfo = DirectoryFileInfo(
+                        folder = folder,
+                        path = path,
+                        isDeleted = isDeleted,
+                        versionList = versionList,
+                        lastModified = lastModified
+                )
+
+                fileInfo to null
+            }
             else -> {
                 logger.warn("unsupported file type = {}, discarding file info", bepFileInfo.type)
-                return null
+
+                null
             }
         }
-
-        return builder.build() to fileBlocks
     }
 
     private fun shouldUpdateRecord(
@@ -132,31 +145,27 @@ object IndexElementProcessor {
     ) {
         val oldMissing = oldRecord == null || oldRecord.isDeleted
         val newMissing = newRecord.isDeleted
-        val oldSizeMissing = oldMissing || !oldRecord!!.isFile()
-        val newSizeMissing = newMissing || !newRecord.isFile()
 
-        if (!oldSizeMissing) {
-            folderStatsUpdateCollector.deltaSize -= oldRecord!!.size!!
+        if (oldRecord is FileFileInfo && !oldMissing) {
+            folderStatsUpdateCollector.deltaSize -= oldRecord.size
         }
 
-        if (!newSizeMissing) {
-            folderStatsUpdateCollector.deltaSize += newRecord.size!!
+        if (newRecord is FileFileInfo && !newMissing) {
+            folderStatsUpdateCollector.deltaSize += newRecord.size
         }
 
         if (!oldMissing) {
-            if (oldRecord!!.isFile()) {
-                folderStatsUpdateCollector.deltaFileCount--
-            } else if (oldRecord.isDirectory()) {
-                folderStatsUpdateCollector.deltaDirCount--
-            }
+            when (oldRecord!!) {
+                is FileFileInfo -> folderStatsUpdateCollector.deltaFileCount--
+                is DirectoryFileInfo -> folderStatsUpdateCollector.deltaDirCount--
+            }.let { /* require handling all paths */ }
         }
 
         if (!newMissing) {
-            if (newRecord.isFile()) {
-                folderStatsUpdateCollector.deltaFileCount++
-            } else if (newRecord.isDirectory()) {
-                folderStatsUpdateCollector.deltaDirCount++
-            }
+            when (newRecord) {
+                is FileFileInfo -> folderStatsUpdateCollector.deltaFileCount++
+                is DirectoryFileInfo -> folderStatsUpdateCollector.deltaDirCount++
+            }.let { /* require handling all paths */ }
         }
 
         folderStatsUpdateCollector.lastModified = newRecord.lastModified
