@@ -19,5 +19,7 @@ interface Sequencer {
 
     fun nextSequence(): Long
 
+    fun nextSequences(size: Int): Iterable<Long>
+
     fun currentSequence(): Long
 }

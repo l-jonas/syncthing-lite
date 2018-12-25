@@ -49,7 +49,9 @@ interface IndexTransaction {
 
     fun findAllFolderStats(): List<FolderStats>
 
-    fun updateOrInsertFolderStats(folder: String, deltaFileCount: Long, deltaDirCount: Long, deltaSize: Long, lastUpdate: Date)
+    fun updateOrInsertFolderStats(folder: String, deltaFileCount: Long, deltaDirCount: Long, deltaSize: Long)
+
+    fun updateOrInsertFolderStats(folder: String, lastUpdate: Date)
 
     fun findFileInfoBySearchTerm(query: String): List<FileInfo>
 

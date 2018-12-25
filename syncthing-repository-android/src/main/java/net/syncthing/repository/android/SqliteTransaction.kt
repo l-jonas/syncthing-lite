@@ -50,7 +50,13 @@ class SqliteTransaction(
     }
 
     override fun findFileInfoLastModified(folder: String, path: String): Date? = runIfAllowed {
-        database.fileInfo().findFileInfoLastModified(folder, path)?.lastModified
+        database.fileInfo().findFileInfoLastModified(folder, path)?.native?.roundedMilliseconds.let { ms ->
+            if (ms != null) {
+                Date(ms)
+            } else {
+                null
+            }
+        }
     }
 
     override fun findNotDeletedFileInfo(folder: String, path: String) = runIfAllowed {
@@ -109,11 +115,19 @@ class SqliteTransaction(
             folder: String,
             deltaFileCount: Long,
             deltaDirCount: Long,
-            deltaSize: Long,
+            deltaSize: Long
+    ) = runIfAllowed {
+        if (database.folderStats().updateFolderStats(folder, deltaFileCount, deltaDirCount, deltaSize) == 0L) {
+            database.folderStats().insertFolderStats(FolderStatsItem(folder, deltaFileCount, deltaDirCount, Date(0), deltaSize))
+        }
+    }
+
+    override fun updateOrInsertFolderStats(
+            folder: String,
             lastUpdate: Date
     ) = runIfAllowed {
-        if (database.folderStats().updateFolderStats(folder, deltaFileCount, deltaDirCount, deltaSize, lastUpdate) == 0L) {
-            database.folderStats().insertFolderStats(FolderStatsItem(folder, deltaFileCount, deltaDirCount, lastUpdate, deltaSize))
+        if (database.folderStats().updateFolderStats(folder, lastUpdate) == 0L) {
+            database.folderStats().insertFolderStats(FolderStatsItem(folder, 0, 0, lastUpdate, 0))
         }
     }
 
@@ -166,6 +180,21 @@ class SqliteTransaction(
             database.indexSequence().incrementSequenceNumber(indexId())
 
             currentSequence()
+        }
+
+        override fun nextSequences(size: Int): Iterable<Long> {
+            return if (size == 0) {
+                emptyList()
+            } else if (size < 0) {
+                throw IllegalArgumentException()
+            } else {
+                database.indexSequence().incrementSequenceNumberBy(indexId(), size)
+
+                val end = currentSequence()
+                val start = end - (size - 1)
+
+                start..end
+            }
         }
     }
 

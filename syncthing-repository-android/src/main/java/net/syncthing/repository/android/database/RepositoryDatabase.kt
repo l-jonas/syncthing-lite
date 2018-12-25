@@ -8,7 +8,7 @@ import net.syncthing.repository.android.database.dao.*
 import net.syncthing.repository.android.database.item.*
 
 @Database(
-        version = 2,
+        version = 3,
         entities = [
             FileBlocksItem::class,
             FileInfoItem::class,

@@ -15,4 +15,7 @@ interface IndexSequenceDao {
 
     @Query("UPDATE index_sequence SET current_sequence = current_sequence + 1 WHERE index_id = :indexId")
     fun incrementSequenceNumber(indexId: Long)
+
+    @Query("UPDATE index_sequence SET current_sequence = current_sequence + :incrementBy WHERE index_id = :indexId")
+    fun incrementSequenceNumberBy(indexId: Long, incrementBy: Int)
 }

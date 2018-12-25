@@ -151,14 +151,7 @@ class IndexBrowser internal constructor(
 
     fun getFileInfoByAbsolutePathAllowNull(folder: String, path: String): FileInfo? {
         return if (PathUtils.isRoot(path)) {
-            DirectoryFileInfo(
-                    folder = folder,
-                    path = PathUtils.ROOT_PATH,
-                    isDeleted = false,
-                    versionList = emptyList(),
-                    // TODO: is there a last modified somewhere?
-                    lastModified = Date(0)
-            )
+            DirectoryFileInfo.createFolderRootDummyInfo(folder)
         } else {
             indexRepository.runInTransaction { it.findNotDeletedFileInfo(folder, path) }
         }
@@ -169,14 +162,7 @@ class IndexBrowser internal constructor(
 
     fun getFileInfoByPathAllowNull(folder: String, path: String, transaction: IndexTransaction): FileInfo? {
         return if (PathUtils.isRoot(path)) {
-            DirectoryFileInfo(
-                    folder = folder,
-                    path = PathUtils.ROOT_PATH,
-                    isDeleted = false,
-                    versionList = emptyList(),
-                    // TODO: is there a last modified somewhere?
-                    lastModified = Date(0)
-            )
+            DirectoryFileInfo.createFolderRootDummyInfo(folder)
         } else {
             transaction.findNotDeletedFileInfo(folder, path)
         }

@@ -7,7 +7,7 @@ import net.syncthing.java.core.beans.FolderStats
 import net.syncthing.java.core.beans.IndexInfo
 import net.syncthing.java.core.interfaces.IndexTransaction
 import org.slf4j.LoggerFactory
-import java.lang.RuntimeException
+import java.util.*
 
 object IndexMessageProcessor {
     private val logger = LoggerFactory.getLogger(IndexMessageProcessor::class.java)
@@ -60,9 +60,17 @@ object IndexMessageProcessor {
                 folder = folderStatsUpdateCollector.folderId,
                 deltaSize = folderStatsUpdateCollector.deltaSize,
                 deltaFileCount = folderStatsUpdateCollector.deltaFileCount,
-                deltaDirCount = folderStatsUpdateCollector.deltaDirCount,
-                lastUpdate = folderStatsUpdateCollector.lastModified
+                deltaDirCount = folderStatsUpdateCollector.deltaDirCount
         )
+
+        folderStatsUpdateCollector.lastModified.let { fileLastModifiedTime ->
+            if (fileLastModifiedTime != null) {
+                transaction.updateOrInsertFolderStats(
+                        folder = folderStatsUpdateCollector.folderId,
+                        lastUpdate = Date(fileLastModifiedTime.roundedMilliseconds)
+                )
+            }
+        }
     }
 
     data class Result(val newIndexInfo: IndexInfo, val updatedFiles: List<FileInfo>, val newFolderStats: FolderStats)

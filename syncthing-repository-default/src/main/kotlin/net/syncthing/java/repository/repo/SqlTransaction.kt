@@ -72,6 +72,24 @@ class SqlTransaction(
         currentSequence()
     }
 
+    override fun nextSequences(size: Int): Iterable<Long> {
+        return if (size == 0) {
+            emptyList()
+        } else if (size < 0) {
+            throw IllegalArgumentException()
+        } else {
+            connection.prepareStatement("UPDATE index_sequence SET current_sequence = current_sequence + ?").use { statement ->
+                statement.setInt(0, size)
+                assert(statement.executeUpdate() == 1)
+            }
+
+            val end = currentSequence()
+            val start = end - (size - 1)
+
+            start..end
+        }
+    }
+
     override fun updateIndexInfo(indexInfo: IndexInfo): Unit = runIfAllowed {
         connection.prepareStatement("MERGE INTO folder_index_info"
                 + " (folder,device_id,index_id,local_sequence,max_sequence)"
@@ -185,7 +203,7 @@ class SqlTransaction(
         val folder = resultSet.getString("folder")
         val path = resultSet.getString("path")
         val fileType = resultSet.getString("file_type")
-        val lastModified = Date(resultSet.getLong("last_modified"))
+        val lastModified = FileLastModifiedTime(resultSet.getLong("last_modified_s"), resultSet.getInt("last_modified_ns"))
         val versionList = listOf(FileVersion(resultSet.getLong("version_id"), resultSet.getLong("version_value")))
         val isDeleted = resultSet.getBoolean("is_deleted")
 
@@ -195,7 +213,11 @@ class SqlTransaction(
                     path = path,
                     isDeleted = isDeleted,
                     versionList = versionList,
-                    lastModified = lastModified
+                    lastModified = lastModified,
+                    lastModifiedBy = resultSet.getLong("last_modified_by"),
+                    permissions = resultSet.getInt("permissions"),
+                    noPermissions = resultSet.getInt("no_permissions") != 0,
+                    sequence = resultSet.getLong("sequence")
             )
             SqlConstants.FILE_TYPE_FILE -> FileFileInfo(
                     folder = folder,
@@ -204,7 +226,12 @@ class SqlTransaction(
                     versionList = versionList,
                     hash = resultSet.getString("hash"),
                     size = resultSet.getLong("size"),
-                    lastModified = lastModified
+                    lastModified = lastModified,
+                    lastModifiedBy = resultSet.getLong("last_modified_by"),
+                    permissions = resultSet.getInt("permissions"),
+                    noPermissions = resultSet.getInt("no_permissions") != 0,
+                    sequence = resultSet.getLong("sequence"),
+                    invalid = resultSet.getInt("invalid") != 0
             )
             SqlConstants.FILE_TYPE_SYMLINK -> SymlinkFileInfo(
                     folder = folder,
@@ -212,7 +239,11 @@ class SqlTransaction(
                     isDeleted = isDeleted,
                     versionList = versionList,
                     lastModified = lastModified,
-                    symlinkTarget = resultSet.getString("symlink_target")
+                    symlinkTarget = resultSet.getString("symlink_target"),
+                    lastModifiedBy = resultSet.getLong("last_modified_by"),
+                    permissions = resultSet.getInt("permissions"),
+                    noPermissions = resultSet.getInt("no_permissions") != 0,
+                    sequence = resultSet.getLong("sequence")
             )
             else -> throw IllegalStateException("unknown file type: $fileType")
         }
@@ -272,13 +303,14 @@ class SqlTransaction(
         }
 
         connection.prepareStatement("MERGE INTO file_info"
-                + " (folder,path,file_name,parent,size,hash,last_modified,file_type,version_id,version_value,is_deleted,symlink_target)"
+                + " (folder,path,file_name,parent,size,hash,last_modified_s,file_type,version_id,version_value,is_deleted,symlink_target,last_modified_ns,last_modified_by,permissions,no_permissions,invalid,sequence)"
                 + " VALUES (?,?,?,?,?,?,?,?,?,?,?)").use { prepareStatement ->
             prepareStatement.setString(1, fileInfo.folder)
             prepareStatement.setString(2, fileInfo.path)
             prepareStatement.setString(3, fileInfo.fileName)
             prepareStatement.setString(4, fileInfo.parent)
-            prepareStatement.setLong(7, fileInfo.lastModified.time)
+            prepareStatement.setLong(7, fileInfo.lastModified.seconds)
+            prepareStatement.setInt(13, fileInfo.lastModified.nanoSeconds)
             prepareStatement.setString(8, when (fileInfo) {
                 is FileFileInfo -> SqlConstants.FILE_TYPE_FILE
                 is DirectoryFileInfo -> SqlConstants.FILE_TYPE_DIRECTORY
@@ -287,6 +319,11 @@ class SqlTransaction(
             prepareStatement.setLong(9, version.id)
             prepareStatement.setLong(10, version.value)
             prepareStatement.setBoolean(11, fileInfo.isDeleted)
+            prepareStatement.setLong(14, fileInfo.lastModifiedBy)
+            prepareStatement.setInt(15, fileInfo.permissions)
+            prepareStatement.setInt(16, if (fileInfo.noPermissions) 1 else 0)
+            prepareStatement.setInt(17, if (fileInfo is FileFileInfo && fileInfo.invalid) 1 else 0)
+            prepareStatement.setLong(18, fileInfo.sequence)
             when (fileInfo) {
                 is FileFileInfo -> {
                     prepareStatement.setLong(5, fileInfo.size)
@@ -332,7 +369,7 @@ class SqlTransaction(
         }
 
         connection.prepareStatement("MERGE INTO file_info"
-                + " (folder,path,file_name,parent,size,hash,last_modified,file_type,version_id,version_value,is_deleted,symlink_target)"
+                + " (folder,path,file_name,parent,size,hash,last_modified_s,file_type,version_id,version_value,is_deleted,symlink_target,last_modified_ns,last_modified_by,permissions,no_permissions,invalid,sequence)"
                 + " VALUES (?,?,?,?,?,?,?,?,?,?,?)").use { prepareStatement ->
 
             fileInfos.forEach { fileInfo ->
@@ -342,7 +379,8 @@ class SqlTransaction(
                 prepareStatement.setString(2, fileInfo.path)
                 prepareStatement.setString(3, fileInfo.fileName)
                 prepareStatement.setString(4, fileInfo.parent)
-                prepareStatement.setLong(7, fileInfo.lastModified.time)
+                prepareStatement.setLong(7, fileInfo.lastModified.seconds)
+                prepareStatement.setInt(13, fileInfo.lastModified.nanoSeconds)
                 prepareStatement.setString(8, when (fileInfo) {
                     is FileFileInfo -> SqlConstants.FILE_TYPE_FILE
                     is DirectoryFileInfo -> SqlConstants.FILE_TYPE_DIRECTORY
@@ -351,6 +389,11 @@ class SqlTransaction(
                 prepareStatement.setLong(9, version.id)
                 prepareStatement.setLong(10, version.value)
                 prepareStatement.setBoolean(11, fileInfo.isDeleted)
+                prepareStatement.setLong(14, fileInfo.lastModifiedBy)
+                prepareStatement.setInt(15, fileInfo.permissions)
+                prepareStatement.setInt(16, if (fileInfo.noPermissions) 1 else 0)
+                prepareStatement.setInt(17, if (fileInfo is FileFileInfo && fileInfo.invalid) 1 else 0)
+                prepareStatement.setLong(18, fileInfo.sequence)
                 when (fileInfo) {
                     is FileFileInfo -> {
                         prepareStatement.setLong(5, fileInfo.size)
@@ -468,8 +511,12 @@ class SqlTransaction(
         }
     }
 
-    override fun updateOrInsertFolderStats(folder: String, deltaFileCount: Long, deltaDirCount: Long, deltaSize: Long, lastUpdate: Date) {
-        updateFolderStats(connection, folder, deltaFileCount, deltaDirCount, deltaSize, lastUpdate)
+    override fun updateOrInsertFolderStats(folder: String, deltaFileCount: Long, deltaDirCount: Long, deltaSize: Long) {
+        updateFolderStats(connection, folder, deltaFileCount, deltaDirCount, deltaSize, null)
+    }
+
+    override fun updateOrInsertFolderStats(folder: String, lastUpdate: Date) {
+        updateFolderStats(connection, folder, 0, 0, 0, lastUpdate)
     }
 
     @Throws(SQLException::class)
@@ -479,7 +526,7 @@ class SqlTransaction(
             deltaFileCount: Long,
             deltaDirCount: Long,
             deltaSize: Long,
-            lastUpdate: Date
+            lastUpdate: Date?
     ): FolderStats = runIfAllowed {
         val oldFolderStats = findFolderStats(folder)
         val newFolderStats: FolderStats
@@ -489,7 +536,7 @@ class SqlTransaction(
                     dirCount = deltaDirCount,
                     fileCount = deltaFileCount,
                     folderId = folder,
-                    lastUpdate = lastUpdate,
+                    lastUpdate = lastUpdate ?: Date(0),
                     size = deltaSize
             )
         } else {
@@ -497,7 +544,7 @@ class SqlTransaction(
                     dirCount = oldFolderStats.dirCount + deltaDirCount,
                     fileCount = oldFolderStats.fileCount + deltaFileCount,
                     size = oldFolderStats.size + deltaSize,
-                    lastUpdate = if (lastUpdate.after(oldFolderStats.lastUpdate)) lastUpdate else oldFolderStats.lastUpdate
+                    lastUpdate = if (lastUpdate?.after(oldFolderStats.lastUpdate) == true) lastUpdate else oldFolderStats.lastUpdate
             )
         }
         updateFolderStats(connection, newFolderStats)

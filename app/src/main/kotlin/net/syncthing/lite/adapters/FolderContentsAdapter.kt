@@ -48,7 +48,7 @@ class FolderContentsAdapter: RecyclerView.Adapter<FolderContentsViewHolder>() {
                 binding.fileIcon.setImageResource(R.drawable.ic_image_black_24dp)
                 binding.fileSize = binding.root.context.getString(R.string.file_info,
                         FileUtils.byteCountToDisplaySize(fileInfo.size),
-                        DateUtils.getRelativeDateTimeString(binding.root.context, fileInfo.lastModified.time, DateUtils.MINUTE_IN_MILLIS, DateUtils.WEEK_IN_MILLIS, 0))
+                        DateUtils.getRelativeDateTimeString(binding.root.context, fileInfo.lastModified.seconds * 1000, DateUtils.MINUTE_IN_MILLIS, DateUtils.WEEK_IN_MILLIS, 0))
             }
             is SymlinkFileInfo -> {
                 binding.fileIcon.setImageResource(R.drawable.ic_image_black_24dp)

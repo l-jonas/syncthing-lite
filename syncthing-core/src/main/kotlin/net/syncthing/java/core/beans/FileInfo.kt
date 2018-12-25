@@ -15,40 +15,70 @@
 package net.syncthing.java.core.beans
 
 import net.syncthing.java.core.utils.PathUtils
-import java.util.*
 
 sealed class FileInfo {
     abstract val folder: String
     abstract val path: String
-    abstract val lastModified: Date
+    abstract val lastModified: FileLastModifiedTime
+    abstract val lastModifiedBy: Long
     abstract val isDeleted: Boolean
     abstract val versionList: List<FileVersion>
     abstract val fileName: String
     abstract val parent: String
+    abstract val permissions: Int
+    abstract val noPermissions: Boolean
+    abstract val sequence: Long
+
+    abstract fun withSequenceNumber(sequence: Long): FileInfo
 }
 
 data class DirectoryFileInfo(
         override val folder: String,
         override val path: String,
-        override val lastModified: Date,
+        override val lastModified: FileLastModifiedTime,
+        override val lastModifiedBy: Long,
         override val isDeleted: Boolean,
-        override val versionList: List<FileVersion>
+        override val versionList: List<FileVersion>,
+        override val permissions: Int,
+        override val noPermissions: Boolean,
+        override val sequence: Long
 ): FileInfo() {
     override val fileName = PathUtils.getFileName(path)
     override val parent = if (PathUtils.isRoot(path))
         PathUtils.ROOT_PATH
     else
         PathUtils.getParentPath(path)
+
+    override fun withSequenceNumber(sequence: Long): DirectoryFileInfo = copy(sequence = sequence)
+
+    companion object {
+        fun createFolderRootDummyInfo(folder: String) = DirectoryFileInfo(
+                folder = folder,
+                path = PathUtils.ROOT_PATH,
+                isDeleted = false,
+                versionList = emptyList(),
+                lastModified = FileLastModifiedTime.empty,
+                lastModifiedBy = 0,
+                noPermissions = true,
+                permissions = "066".toInt(8),
+                sequence = 0
+        )
+    }
 }
 
 data class FileFileInfo(
         override val folder: String,
         override val path: String,
-        override val lastModified: Date,
+        override val lastModified: FileLastModifiedTime,
+        override val lastModifiedBy: Long,
         override val isDeleted: Boolean,
         override val versionList: List<FileVersion>,
+        override val permissions: Int,
+        override val noPermissions: Boolean,
         val hash: String,
-        val size: Long
+        val size: Long,
+        val invalid: Boolean,
+        override val sequence: Long
 ): FileInfo() {
     companion object {
         fun checkBlocks(fileInfo: FileFileInfo, fileBlocks: FileBlocks) {
@@ -61,18 +91,51 @@ data class FileFileInfo(
 
     override val fileName = PathUtils.getFileName(path)
     override val parent = PathUtils.getParentPath(path)
+
+    override fun withSequenceNumber(sequence: Long): FileFileInfo = copy(sequence = sequence)
 }
 
 data class SymlinkFileInfo(
         override val folder: String,
         override val path: String,
-        override val lastModified: Date,
+        override val lastModified: FileLastModifiedTime,
+        override val lastModifiedBy: Long,
         override val isDeleted: Boolean,
         override val versionList: List<FileVersion>,
-        val symlinkTarget: String
+        override val permissions: Int,
+        override val noPermissions: Boolean,
+        val symlinkTarget: String,
+        override val sequence: Long
 ): FileInfo() {
     override val fileName = PathUtils.getFileName(path)
     override val parent = PathUtils.getParentPath(path)
+
+    override fun withSequenceNumber(sequence: Long): SymlinkFileInfo = copy(sequence = sequence)
 }
 
 data class FileVersion(val id: Long, val value: Long)
+
+data class FileLastModifiedTime(
+        val seconds: Long,
+        val nanoSeconds: Int
+): Comparable<FileLastModifiedTime> {
+    val roundedMilliseconds = seconds * 1000 + nanoSeconds / 1000000
+
+    override fun compareTo(other: FileLastModifiedTime) = if (seconds > other.seconds) {
+        1
+    } else if (seconds < other.seconds) {
+        -1
+    } else {
+        if (nanoSeconds > other.nanoSeconds) {
+            1
+        } else if (nanoSeconds < other.nanoSeconds) {
+            -1
+        } else {
+            0
+        }
+    }
+
+    companion object {
+        val empty = FileLastModifiedTime(0, 0)
+    }
+}

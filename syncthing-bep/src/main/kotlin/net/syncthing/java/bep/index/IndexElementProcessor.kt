@@ -5,7 +5,6 @@ import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.interfaces.IndexTransaction
 import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
-import java.util.*
 
 object IndexElementProcessor {
     private val logger = LoggerFactory.getLogger(IndexElementProcessor::class.java)
@@ -24,20 +23,21 @@ object IndexElementProcessor {
                 .distinctBy { it.name /* this is the whole path */ }
                 .reversed()
 
-        val preparedUpdates = filesToProcess.mapNotNull { prepareUpdate(folder, it) }
-
+        val preparedUpdates = filesToProcess.mapNotNull { prepareUpdate(folder, it, 0) }
         val updatesToApply = preparedUpdates.filter { shouldUpdateRecord(oldRecords[it.first.path], it.first) }
+        val sequenceNumbers = transaction.getSequencer().nextSequences(updatesToApply.size).iterator()
+        val updatesWithSequenceNumbers = updatesToApply.map { it.first.withSequenceNumber(sequenceNumbers.next()) to it.second }
 
         transaction.updateFileInfoAndBlocks(
-                fileInfos = updatesToApply.map { it.first },
-                fileBlocks = updatesToApply.mapNotNull { it.second }
+                fileInfos = updatesWithSequenceNumbers.map { it.first },
+                fileBlocks = updatesWithSequenceNumbers.mapNotNull { it.second }
         )
 
-        for ((newRecord) in updatesToApply) {
+        for ((newRecord) in updatesWithSequenceNumbers) {
             updateFolderStatsCollector(oldRecords[newRecord.path], newRecord, folderStatsUpdateCollector)
         }
 
-        return updatesToApply.map { it.first }
+        return updatesWithSequenceNumbers.map { it.first }
     }
 
     fun pushRecord(
@@ -47,7 +47,7 @@ object IndexElementProcessor {
             folderStatsUpdateCollector: FolderStatsUpdateCollector,
             oldRecord: FileInfo?
     ): FileInfo? {
-        val update = prepareUpdate(folder, bepFileInfo)
+        val update = prepareUpdate(folder, bepFileInfo, transaction.getSequencer().nextSequence())
 
         return if (update != null) {
             addRecord(
@@ -64,11 +64,15 @@ object IndexElementProcessor {
 
     private fun prepareUpdate(
             folder: String,
-            bepFileInfo: BlockExchangeProtos.FileInfo
+            bepFileInfo: BlockExchangeProtos.FileInfo,
+            sequenceNumber: Long
     ): Pair<FileInfo, FileBlocks?>? {
         val path = bepFileInfo.name
         val isDeleted = bepFileInfo.deleted
-        val lastModified = Date(bepFileInfo.modifiedS * 1000 + bepFileInfo.modifiedNs / 1000000)
+        val lastModified = FileLastModifiedTime(
+                seconds = bepFileInfo.modifiedS,
+                nanoSeconds = bepFileInfo.modifiedNs
+        )
         val versionList = (bepFileInfo.version?.countersList ?: emptyList())
                 .map { record -> FileVersion(record.id, record.value) }
 
@@ -89,7 +93,12 @@ object IndexElementProcessor {
                         lastModified = lastModified,
                         versionList = versionList,
                         hash = fileBlocks.hash,
-                        size = bepFileInfo.size
+                        size = bepFileInfo.size,
+                        lastModifiedBy = bepFileInfo.modifiedBy,
+                        invalid = true,  // we don't serve this file
+                        permissions = bepFileInfo.permissions,
+                        noPermissions = bepFileInfo.noPermissions,
+                        sequence = sequenceNumber
                 )
 
                 fileInfo to fileBlocks
@@ -100,7 +109,27 @@ object IndexElementProcessor {
                         path = path,
                         isDeleted = isDeleted,
                         versionList = versionList,
-                        lastModified = lastModified
+                        lastModified = lastModified,
+                        lastModifiedBy = bepFileInfo.modifiedBy,
+                        permissions = bepFileInfo.permissions,
+                        noPermissions = bepFileInfo.noPermissions,
+                        sequence = sequenceNumber
+                )
+
+                fileInfo to null
+            }
+            BlockExchangeProtos.FileInfoType.SYMLINK -> {
+                val fileInfo = SymlinkFileInfo(
+                        folder = folder,
+                        path = path,
+                        isDeleted = isDeleted,
+                        versionList = versionList,
+                        lastModified = lastModified,
+                        lastModifiedBy = bepFileInfo.modifiedBy,
+                        symlinkTarget = bepFileInfo.symlinkTarget,
+                        sequence = bepFileInfo.sequence,
+                        permissions = bepFileInfo.permissions,
+                        noPermissions = bepFileInfo.noPermissions
                 )
 
                 fileInfo to null

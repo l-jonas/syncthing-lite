@@ -108,12 +108,18 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, TempRepo
                     + "parent VARCHAR NOT NULL,"
                     + "size BIGINT,"
                     + "hash VARCHAR,"
-                    + "last_modified BIGINT NOT NULL,"
+                    + "last_modified_s BIGINT NOT NULL,"
+                    + "last_modified_ns INT NOT NULL,"
+                    + "last_modified_by BIGINT NOT NULL,"
                     + "file_type VARCHAR NOT NULL,"
                     + "version_id BIGINT NOT NULL,"
                     + "version_value BIGINT NOT NULL,"
                     + "is_deleted BOOLEAN NOT NULL,"
                     + "symlink_target VARCHAR NOT NULL,"
+                    + "permissions INT NOT NULL,"
+                    + "no_permissions INT NOT NULL,"
+                    + "invalid INT NOT NULL,"
+                    + "sequence BIGINT NOT NULL,"
                     + "PRIMARY KEY (folder, path))").use { prepareStatement -> prepareStatement.execute() }
             connection.prepareStatement("CREATE TABLE file_blocks (folder VARCHAR NOT NULL,"
                     + "path VARCHAR NOT NULL,"
@@ -238,6 +244,6 @@ class SqlRepository(databaseFolder: File) : Closeable, IndexRepository, TempRepo
     }
 
     companion object {
-        private const val VERSION = 14
+        private const val VERSION = 15
     }
 }
