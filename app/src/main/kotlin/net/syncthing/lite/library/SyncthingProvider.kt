@@ -12,10 +12,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import net.syncthing.java.bep.index.browser.DirectoryContentListing
 import net.syncthing.java.bep.index.browser.DirectoryNotFoundListing
-import net.syncthing.java.core.beans.DirectoryFileInfo
-import net.syncthing.java.core.beans.FileFileInfo
-import net.syncthing.java.core.beans.FileInfo
-import net.syncthing.java.core.beans.FolderInfo
+import net.syncthing.java.core.beans.*
 import net.syncthing.lite.R
 import net.syncthing.lite.utils.MimeType
 import java.io.FileNotFoundException
@@ -164,6 +161,7 @@ class SyncthingProvider : DocumentsProvider() {
                     when (fileInfo) {
                         is DirectoryFileInfo -> 0
                         is FileFileInfo -> fileInfo.size
+                        is SymlinkFileInfo -> 0
                     }
             )
             add(
@@ -171,6 +169,7 @@ class SyncthingProvider : DocumentsProvider() {
                     when (fileInfo) {
                         is DirectoryFileInfo -> Document.MIME_TYPE_DIR
                         is FileFileInfo -> MimeType.getFromFilename(fileInfo.fileName)
+                        is SymlinkFileInfo -> "symlink"
                     }
             )
             add(Document.COLUMN_LAST_MODIFIED, fileInfo.lastModified)

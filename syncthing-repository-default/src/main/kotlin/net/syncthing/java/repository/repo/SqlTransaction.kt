@@ -206,6 +206,14 @@ class SqlTransaction(
                     size = resultSet.getLong("size"),
                     lastModified = lastModified
             )
+            SqlConstants.FILE_TYPE_SYMLINK -> SymlinkFileInfo(
+                    folder = folder,
+                    path = path,
+                    isDeleted = isDeleted,
+                    versionList = versionList,
+                    lastModified = lastModified,
+                    symlinkTarget = resultSet.getString("symlink_target")
+            )
             else -> throw IllegalStateException("unknown file type: $fileType")
         }
     }
@@ -264,7 +272,7 @@ class SqlTransaction(
         }
 
         connection.prepareStatement("MERGE INTO file_info"
-                + " (folder,path,file_name,parent,size,hash,last_modified,file_type,version_id,version_value,is_deleted)"
+                + " (folder,path,file_name,parent,size,hash,last_modified,file_type,version_id,version_value,is_deleted,symlink_target)"
                 + " VALUES (?,?,?,?,?,?,?,?,?,?,?)").use { prepareStatement ->
             prepareStatement.setString(1, fileInfo.folder)
             prepareStatement.setString(2, fileInfo.path)
@@ -274,6 +282,7 @@ class SqlTransaction(
             prepareStatement.setString(8, when (fileInfo) {
                 is FileFileInfo -> SqlConstants.FILE_TYPE_FILE
                 is DirectoryFileInfo -> SqlConstants.FILE_TYPE_DIRECTORY
+                is SymlinkFileInfo -> SqlConstants.FILE_TYPE_SYMLINK
             })
             prepareStatement.setLong(9, version.id)
             prepareStatement.setLong(10, version.value)
@@ -282,10 +291,17 @@ class SqlTransaction(
                 is FileFileInfo -> {
                     prepareStatement.setLong(5, fileInfo.size)
                     prepareStatement.setString(6, fileInfo.hash)
+                    prepareStatement.setString(12, "")
                 }
                 is DirectoryFileInfo -> {
                     prepareStatement.setNull(5, Types.BIGINT)
                     prepareStatement.setNull(6, Types.VARCHAR)
+                    prepareStatement.setString(12, "")
+                }
+                is SymlinkFileInfo -> {
+                    prepareStatement.setNull(5, Types.BIGINT)
+                    prepareStatement.setNull(6, Types.VARCHAR)
+                    prepareStatement.setString(12, fileInfo.symlinkTarget)
                 }
             }.let { /* require handling all paths */ }
 
@@ -316,7 +332,7 @@ class SqlTransaction(
         }
 
         connection.prepareStatement("MERGE INTO file_info"
-                + " (folder,path,file_name,parent,size,hash,last_modified,file_type,version_id,version_value,is_deleted)"
+                + " (folder,path,file_name,parent,size,hash,last_modified,file_type,version_id,version_value,is_deleted,symlink_target)"
                 + " VALUES (?,?,?,?,?,?,?,?,?,?,?)").use { prepareStatement ->
 
             fileInfos.forEach { fileInfo ->
@@ -330,6 +346,7 @@ class SqlTransaction(
                 prepareStatement.setString(8, when (fileInfo) {
                     is FileFileInfo -> SqlConstants.FILE_TYPE_FILE
                     is DirectoryFileInfo -> SqlConstants.FILE_TYPE_DIRECTORY
+                    is SymlinkFileInfo -> SqlConstants.FILE_TYPE_SYMLINK
                 })
                 prepareStatement.setLong(9, version.id)
                 prepareStatement.setLong(10, version.value)
@@ -338,10 +355,17 @@ class SqlTransaction(
                     is FileFileInfo -> {
                         prepareStatement.setLong(5, fileInfo.size)
                         prepareStatement.setString(6, fileInfo.hash)
+                        prepareStatement.setString(12, "")
                     }
                     is DirectoryFileInfo -> {
                         prepareStatement.setNull(5, Types.BIGINT)
                         prepareStatement.setNull(6, Types.VARCHAR)
+                        prepareStatement.setString(12, "")
+                    }
+                    is SymlinkFileInfo -> {
+                        prepareStatement.setNull(5, Types.BIGINT)
+                        prepareStatement.setNull(6, Types.VARCHAR)
+                        prepareStatement.setString(12, fileInfo.symlinkTarget)
                     }
                 }.let { /* require handling all paths */ }
 

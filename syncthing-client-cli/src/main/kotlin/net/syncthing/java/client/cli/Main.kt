@@ -18,10 +18,7 @@ import kotlinx.coroutines.runBlocking
 import net.syncthing.java.bep.index.browser.DirectoryContentListing
 import net.syncthing.java.bep.index.browser.IndexBrowser
 import net.syncthing.java.client.SyncthingClient
-import net.syncthing.java.core.beans.DeviceId
-import net.syncthing.java.core.beans.DeviceInfo
-import net.syncthing.java.core.beans.DirectoryFileInfo
-import net.syncthing.java.core.beans.FileFileInfo
+import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.repository.repo.SqlRepository
 import org.apache.commons.cli.*
@@ -198,6 +195,9 @@ class Main(private val commandLine: CommandLine) {
                                 }
                                 is DirectoryFileInfo -> {
                                     System.out.println("d\t${fileInfo.path}")
+                                }
+                                is SymlinkFileInfo -> {
+                                    System.out.println("s\t${fileInfo.path}\t${fileInfo.symlinkTarget}")
                                 }
                             }.let { /* require handling all paths */ }
                         }

@@ -8,7 +8,7 @@ import net.syncthing.repository.android.database.dao.*
 import net.syncthing.repository.android.database.item.*
 
 @Database(
-        version = 1,
+        version = 2,
         entities = [
             FileBlocksItem::class,
             FileInfoItem::class,
@@ -26,12 +26,12 @@ abstract class RepositoryDatabase: RoomDatabase() {
                 context.applicationContext,
                 RepositoryDatabase::class.java,
                 name
-        ).build()
+        ).addMigrations(*Migrations.migrations).build()
 
         fun createInMemoryInstance(context: Context) = Room.inMemoryDatabaseBuilder(
                 context.applicationContext,
                 RepositoryDatabase::class.java
-        ).build()
+        ).addMigrations(*Migrations.migrations).build()
 
         fun with(context: Context): RepositoryDatabase {
             if (instance == null) {

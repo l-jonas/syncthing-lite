@@ -4,10 +4,7 @@ import android.arch.persistence.room.ColumnInfo
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.Index
 import android.arch.persistence.room.TypeConverters
-import net.syncthing.java.core.beans.DirectoryFileInfo
-import net.syncthing.java.core.beans.FileFileInfo
-import net.syncthing.java.core.beans.FileInfo
-import net.syncthing.java.core.beans.FileVersion
+import net.syncthing.java.core.beans.*
 import net.syncthing.repository.android.database.converters.DateConverter
 import net.syncthing.repository.android.database.converters.FileTypeConverter
 import java.util.*
@@ -41,7 +38,9 @@ data class FileInfoItem(
         @ColumnInfo(name = "version_value")
         val versionValue: Long,
         @ColumnInfo(name = "is_deleted")
-        val isDeleted: Boolean
+        val isDeleted: Boolean,
+        @ColumnInfo(name = "symlink_target")
+        val symlinkTarget: String
 ) {
     companion object {
         fun fromNative(item: FileInfo) = when (item) {
@@ -56,7 +55,8 @@ data class FileInfoItem(
                     versionValue = item.versionList.last().value,
                     isDeleted = item.isDeleted,
                     size = item.size,
-                    hash = item.hash
+                    hash = item.hash,
+                    symlinkTarget = ""
             )
             is DirectoryFileInfo -> FileInfoItem(
                     folder = item.folder,
@@ -69,7 +69,22 @@ data class FileInfoItem(
                     versionValue = item.versionList.last().value,
                     isDeleted = item.isDeleted,
                     size = null,
-                    hash = null
+                    hash = null,
+                    symlinkTarget = ""
+            )
+            is SymlinkFileInfo -> FileInfoItem(
+                    folder = item.folder,
+                    path = item.path,
+                    fileName = item.fileName,
+                    parent = item.parent,
+                    lastModified = item.lastModified,
+                    fileType = FileInfoItemType.Directory,
+                    versionId = item.versionList.last().id,
+                    versionValue = item.versionList.last().value,
+                    isDeleted = item.isDeleted,
+                    size = null,
+                    hash = null,
+                    symlinkTarget = item.symlinkTarget
             )
         }
     }
@@ -83,6 +98,11 @@ data class FileInfoItem(
             }
             FileInfoItemType.File -> {
                 if (size == null || hash == null) {
+                    throw IllegalArgumentException()
+                }
+            }
+            FileInfoItemType.Symlink -> {
+                if (size != null || hash != null) {
                     throw IllegalArgumentException()
                 }
             }
@@ -114,6 +134,17 @@ data class FileInfoItem(
                     )),
                     isDeleted = isDeleted
             )
+            FileInfoItemType.Symlink -> SymlinkFileInfo(
+                    folder = folder,
+                    path = path,
+                    lastModified = lastModified,
+                    versionList = listOf(FileVersion(
+                            id = versionId,
+                            value = versionValue
+                    )),
+                    isDeleted = isDeleted,
+                    symlinkTarget = symlinkTarget
+            )
         }
     }
 }
@@ -125,5 +156,5 @@ data class FileInfoLastModified(
 )
 
 enum class FileInfoItemType {
-    File, Directory
+    File, Directory, Symlink
 }

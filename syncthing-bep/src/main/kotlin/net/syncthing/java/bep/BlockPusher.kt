@@ -57,6 +57,7 @@ class BlockPusher(private val localDeviceId: DeviceId,
                         when (fileInfo) {
                             is FileFileInfo -> BlockExchangeProtos.FileInfoType.FILE
                             is DirectoryFileInfo -> BlockExchangeProtos.FileInfoType.DIRECTORY
+                            is SymlinkFileInfo -> BlockExchangeProtos.FileInfoType.SYMLINK
                         }
                 )
                 .setDeleted(true), fileInfo.versionList)

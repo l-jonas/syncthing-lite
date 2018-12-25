@@ -158,6 +158,7 @@ object IndexElementProcessor {
             when (oldRecord!!) {
                 is FileFileInfo -> folderStatsUpdateCollector.deltaFileCount--
                 is DirectoryFileInfo -> folderStatsUpdateCollector.deltaDirCount--
+                is SymlinkFileInfo -> null /* ignore it */
             }.let { /* require handling all paths */ }
         }
 
@@ -165,6 +166,7 @@ object IndexElementProcessor {
             when (newRecord) {
                 is FileFileInfo -> folderStatsUpdateCollector.deltaFileCount++
                 is DirectoryFileInfo -> folderStatsUpdateCollector.deltaDirCount++
+                is SymlinkFileInfo -> null /* ignore it */
             }.let { /* require handling all paths */ }
         }
 

@@ -63,4 +63,16 @@ data class FileFileInfo(
     override val parent = PathUtils.getParentPath(path)
 }
 
+data class SymlinkFileInfo(
+        override val folder: String,
+        override val path: String,
+        override val lastModified: Date,
+        override val isDeleted: Boolean,
+        override val versionList: List<FileVersion>,
+        val symlinkTarget: String
+): FileInfo() {
+    override val fileName = PathUtils.getFileName(path)
+    override val parent = PathUtils.getParentPath(path)
+}
+
 data class FileVersion(val id: Long, val value: Long)

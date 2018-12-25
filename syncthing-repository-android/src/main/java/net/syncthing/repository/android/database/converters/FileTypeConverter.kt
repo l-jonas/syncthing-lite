@@ -7,18 +7,21 @@ class FileTypeConverter {
     companion object {
         private const val FILE = "file"
         private const val DIRECTORY = "directory"
+        private const val SYMLINK = "symlink"
     }
 
     @TypeConverter
     fun toString(type: FileInfoItemType) = when (type) {
         FileInfoItemType.Directory -> DIRECTORY
         FileInfoItemType.File -> FILE
+        FileInfoItemType.Symlink -> SYMLINK
     }
 
     @TypeConverter
     fun fromString(value: String)  = when (value) {
         FILE -> FileInfoItemType.File
         DIRECTORY -> FileInfoItemType.Directory
+        SYMLINK -> FileInfoItemType.Symlink
         else -> throw IllegalArgumentException()
     }
 }

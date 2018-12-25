@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import net.syncthing.java.core.beans.DirectoryFileInfo
 import net.syncthing.java.core.beans.FileFileInfo
 import net.syncthing.java.core.beans.FileInfo
+import net.syncthing.java.core.beans.SymlinkFileInfo
 import net.syncthing.lite.R
 import net.syncthing.lite.databinding.ListviewFileBinding
 import org.apache.commons.io.FileUtils
@@ -48,6 +49,10 @@ class FolderContentsAdapter: RecyclerView.Adapter<FolderContentsViewHolder>() {
                 binding.fileSize = binding.root.context.getString(R.string.file_info,
                         FileUtils.byteCountToDisplaySize(fileInfo.size),
                         DateUtils.getRelativeDateTimeString(binding.root.context, fileInfo.lastModified.time, DateUtils.MINUTE_IN_MILLIS, DateUtils.WEEK_IN_MILLIS, 0))
+            }
+            is SymlinkFileInfo -> {
+                binding.fileIcon.setImageResource(R.drawable.ic_image_black_24dp)
+                binding.fileSize = null
             }
         }.let { /* require handling all paths */ }
 
