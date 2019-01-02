@@ -11,7 +11,6 @@ import net.syncthing.java.core.beans.DeviceId
 import net.syncthing.java.core.beans.DeviceInfo
 import net.syncthing.lite.R
 import net.syncthing.lite.library.LibraryManager
-import org.apache.commons.lang3.StringUtils.capitalize
 import org.jetbrains.anko.toast
 import java.io.IOException
 import java.security.InvalidParameterException
@@ -22,13 +21,12 @@ object Util {
     fun getDeviceName(): String {
         val manufacturer = Build.MANUFACTURER ?: ""
         val model = Build.MODEL ?: ""
-        val deviceName =
-                if (model.startsWith(manufacturer)) {
-                    capitalize(model)
-                } else {
-                    capitalize(manufacturer) + " " + model
-                }
-        return deviceName ?: "android"
+
+        return if (model.startsWith(manufacturer)) {
+            model.capitalize()
+        } else {
+            manufacturer.capitalize() + " " + model
+        }
     }
 
     fun getContentFileName(context: Context, uri: Uri): String {
