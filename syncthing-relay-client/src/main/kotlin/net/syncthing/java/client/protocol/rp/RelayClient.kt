@@ -21,8 +21,6 @@ import net.syncthing.java.core.configuration.Configuration
 import net.syncthing.java.core.interfaces.RelayConnection
 import net.syncthing.java.core.security.KeystoreHandler
 import net.syncthing.java.core.utils.NetworkUtils
-import org.apache.commons.io.IOUtils
-import org.bouncycastle.util.encoders.Hex
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.net.InetAddress
@@ -49,7 +47,7 @@ class RelayClient(configuration: Configuration) {
         val outputStream = RelayDataOutputStream(socket.getOutputStream())
         run {
             logger.debug("sending join session request, session key = {}", sessionInvitation.key)
-            val key = Hex.decode(sessionInvitation.key)
+            val key = sessionInvitation.key
             val lengthOfKey = key.size
             outputStream.writeHeader(JOIN_SESSION_REQUEST, 4 + lengthOfKey)
             outputStream.writeInt(lengthOfKey)
@@ -104,7 +102,7 @@ class RelayClient(configuration: Configuration) {
                         NetworkUtils.assertProtocol(messageReader.type == SESSION_INVITATION, {"message type mismatch, expected $SESSION_INVITATION, got ${messageReader.type}"})
                         val builder = SessionInvitation.Builder()
                                 .setFrom(DeviceId.fromHashData(messageReader.readLengthAndData()).deviceId)
-                                .setKey(Hex.toHexString(messageReader.readLengthAndData()))
+                                .setKey(messageReader.readLengthAndData())
                             val address = messageReader.readLengthAndData()
                         if (address.isEmpty()) {
                             builder.setAddress(socket.inetAddress)
@@ -152,7 +150,7 @@ class RelayClient(configuration: Configuration) {
             val length = readInt()
             NetworkUtils.assertProtocol(length >= 0)
             val payload = ByteBuffer.allocate(length)
-            IOUtils.readFully(this, payload.array())
+            readFully(payload.array())
             return MessageReader(type, payload)
         }
     }

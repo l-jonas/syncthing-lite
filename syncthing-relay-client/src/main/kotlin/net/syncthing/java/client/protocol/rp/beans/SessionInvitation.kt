@@ -15,7 +15,7 @@ package net.syncthing.java.client.protocol.rp.beans
 
 import java.net.InetAddress
 
-class SessionInvitation private constructor(val from: String, val key: String, val address: InetAddress, val port: Int, val isServerSocket: Boolean) {
+class SessionInvitation private constructor(val from: String, val key: ByteArray, val address: InetAddress, val port: Int, val isServerSocket: Boolean) {
 
     init {
         assert(!from.isEmpty())
@@ -25,7 +25,7 @@ class SessionInvitation private constructor(val from: String, val key: String, v
     class Builder {
 
         private var from: String? = null
-        private var key: String? = null
+        private var key: ByteArray? = null
         private var address: InetAddress? = null
         private var port: Int = 0
         private var isServerSocket: Boolean = false
@@ -41,7 +41,7 @@ class SessionInvitation private constructor(val from: String, val key: String, v
             return this
         }
 
-        fun setKey(key: String): Builder {
+        fun setKey(key: ByteArray): Builder {
             this.key = key
             return this
         }
