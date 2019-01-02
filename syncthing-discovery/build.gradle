@@ -9,6 +9,8 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation "com.google.protobuf:protobuf-lite:$protobuf_lite_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutines_version"
+    implementation "org.slf4j:slf4j-api:$sl4j_api_version"
+    implementation "com.google.code.gson:gson:$gson_version"
 }
 
 run {

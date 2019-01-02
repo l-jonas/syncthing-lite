@@ -21,7 +21,7 @@ import net.syncthing.java.bep.BlockExchangeProtos
 import net.syncthing.java.core.beans.*
 import net.syncthing.java.core.interfaces.IndexTransaction
 import net.syncthing.java.core.interfaces.Sequencer
-import org.bouncycastle.util.encoders.Hex
+import org.apache.commons.codec.binary.Hex
 import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.SQLException
@@ -220,7 +220,7 @@ class SqlTransaction(
     private fun readFileBlocks(resultSet: ResultSet): FileBlocks {
         val blocks = BlockExchangeExtraProtos.Blocks.parseFrom(resultSet.getBytes("blocks"))
         val blockList = blocks.blocksList.map { record ->
-            BlockInfo(record!!.offset, record.size, Hex.toHexString(record.hash.toByteArray()))
+            BlockInfo(record!!.offset, record.size, Hex.encodeHexString(record.hash.toByteArray()))
         }
         return FileBlocks(resultSet.getString("folder"), resultSet.getString("path"), blockList)
     }
@@ -243,7 +243,7 @@ class SqlTransaction(
                             BlockExchangeProtos.BlockInfo.newBuilder()
                                     .setOffset(input.offset)
                                     .setSize(input.size)
-                                    .setHash(ByteString.copyFrom(Hex.decode(input.hash)))
+                                    .setHash(ByteString.copyFrom(Hex.decodeHex(input.hash)))
                                     .build()
                         }).build().toByteArray())
                 prepareStatement.executeUpdate()
@@ -288,7 +288,7 @@ class SqlTransaction(
                             BlockExchangeProtos.BlockInfo.newBuilder()
                                     .setOffset(input.offset)
                                     .setSize(input.size)
-                                    .setHash(ByteString.copyFrom(Hex.decode(input.hash)))
+                                    .setHash(ByteString.copyFrom(Hex.decodeHex(input.hash)))
                                     .build()
                         }).build().toByteArray())
                 prepareStatement.executeUpdate()

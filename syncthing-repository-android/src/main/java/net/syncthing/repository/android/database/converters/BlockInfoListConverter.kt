@@ -5,7 +5,7 @@ import com.google.protobuf.ByteString
 import net.syncthing.java.bep.BlockExchangeExtraProtos
 import net.syncthing.java.bep.BlockExchangeProtos
 import net.syncthing.java.core.beans.BlockInfo
-import org.bouncycastle.util.encoders.Hex
+import org.apache.commons.codec.binary.Hex
 
 // the original implementation used this approach too
 class BlockInfoListConverter {
@@ -15,12 +15,12 @@ class BlockInfoListConverter {
                 BlockExchangeProtos.BlockInfo.newBuilder()
                         .setOffset(input.offset)
                         .setSize(input.size)
-                        .setHash(ByteString.copyFrom(Hex.decode(input.hash)))
+                        .setHash(ByteString.copyFrom(Hex.decodeHex(input.hash)))
                         .build()
             }).build().toByteArray()
 
     @TypeConverter
     fun fromString(data: ByteArray) = BlockExchangeExtraProtos.Blocks.parseFrom(data).blocksList.map { record ->
-        BlockInfo(record!!.offset, record.size, Hex.toHexString(record.hash.toByteArray()))
+        BlockInfo(record!!.offset, record.size, Hex.encodeHexString(record.hash.toByteArray()))
     }
 }
